@@ -40,19 +40,21 @@ class Node:
     def print_tree(self):
         if self.left:
             self.left.print_tree()
-        print(self.data, self.digest.digest(), self, self.father)
+        print(self.data, self.digest.hexdigest(), self, self.father)
         if self.right:
             self.right.print_tree()
 
     def recalc_tree(self):
         if self.father is None:
             digest = hashlib.sha256()
-            digest.update((self.left.digest.digest() + self.right.digest.digest()))
+            digest.update(bytes(self.left.digest.hexdigest(), 'utf8'))
+            digest.update(bytes(self.right.digest.hexdigest(), 'utf8'))
             self.digest = digest
             self.data = str(self.left.data) + str(self.right.data)
         else:
             digest = hashlib.sha256()
-            digest.update((self.left.digest.digest() + self.right.digest.digest()))
+            digest.update(bytes(self.left.digest.hexdigest(), 'utf8'))
+            digest.update(bytes(self.right.digest.hexdigest(), 'utf8'))
             self.digest = digest
             self.data = str(self.left.data) + str(self.right.data)
             self.father.recalc_tree()
@@ -65,7 +67,7 @@ class Node:
     def find_leaf(self, leaf_num):
         leaf_list = []
         nodes_visited = []
-        while len(leaf_list) != leaf_num:
+        while len(leaf_list) != leaf_num + 1:
             if self.left is None and self.right is None:
                 leaf_list.append(self)
                 nodes_visited.append(self)
@@ -84,35 +86,40 @@ class Node:
     def get_proof(self, leaf_num):
         leaf = self.find_leaf(leaf_num)
         father = leaf.father
-        proof = []
+        proof = ""
         if leaf != father.right:
-            proof.append(father.right.digest.digest())
+            proof += str(father.right.data)
         else:
-            proof.append(father.left.digest.digest())
+            proof += str(father.left.data)
+        leaf = father
+        father = father.father
         while father is not None:
-            if father != father.right:
-                proof.append(father.right.digest.digest())
-                father = father.father
+            if leaf != father.right:
+                proof += " " + str(father.right.data)
             else:
-                proof.append(father.left.digest.digest())
-                father = father.father
-        proof.insert(0, self.get_root())
-        return proof
+                proof += " " + str(father.left.data)
+            leaf = father
+            father = father.father
+        root = str(self.get_root())
+        root += " " + proof
+        return root
 
     def check_proof(self, inc_proof):
-        # hash_list = inc_proof.split(" ")
-        # hash_without_root = []
-        # for i in range(0, len(inc_proof)):
-        #     if i != 1:
-        #         hash_without_root.append(inc_proof[i])
+        hash_list = inc_proof.split(" ")
+        hash_without_root = []
+        for i in range(0, len(hash_list)):
+            if i != 1:
+                hash_without_root.append(hash_list[i])
         digest = hashlib.sha256()
-        for i in range(1, len(inc_proof) - 1):
-            tmp_hash = inc_proof[i] + inc_proof[i + 1]
-            digest.update(tmp_hash)
-            print(digest.digest())
-            inc_proof[i+1] = digest.digest()
+        tmp_digest = hashlib.sha256()
+        # digest.update(bytes(hash_without_root[0] + hash_without_root[1], 'utf8'))
+        # print(digest.hexdigest())
+        for i in range(0, len(hash_without_root)-1):
+            digest.update(bytes(hash_without_root[i] + hash_without_root[i+1], 'utf8'))
+            hash_without_root[i+1] = digest.hexdigest()
+            print(digest.hexdigest())
         print(digest.hexdigest())
-        if digest.hexdigest() == inc_proof[0]:
+        if digest.hexdigest() == hash_list[1]:
             return True
         return False
 
@@ -126,10 +133,8 @@ print("print tree")
 root.print_tree()
 print("print tree root")
 print(root.get_root())
-node = root.find_leaf(3)
-print(node.digest.digest())
-proof = root.get_proof(3)
+node = root.find_leaf(2)
+proof = root.get_proof(2)
 print("print prof")
 print(proof)
-proof.insert(1, node.digest.digest())
-root.check_proof(proof)
+root.check_proof(str(node.digest.hexdigest()) + " " + proof)
