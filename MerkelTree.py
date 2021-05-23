@@ -1,5 +1,10 @@
 import hashlib
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization, hashes
+
 
 class Node:
     def __init__(self, data):
@@ -114,21 +119,55 @@ class MerkleTree:
                 node = node.left
             else:
                 print("hash not in tree")
+                return False
         # reverse locations list and start iterating from leaves to root and calculating hash function
         node_location.reverse()
         for i in range(0, len(hash_without_root) - 1):
             digest = hashlib.sha256()
             # if proof is from the right
-            if node_location[i] is 'right':
+            if node_location[i] == 'right':
                 digest.update((hash_without_root[i] + hash_without_root[i + 1]).encode())
 
             # if proof is from the left
-            if node_location[i] is 'left':
+            if node_location[i] == 'left':
                 digest.update((hash_without_root[i + 1] + hash_without_root[i]).encode())
             hash_without_root[i + 1] = digest.hexdigest()
         if digest.hexdigest() == hash_list[1]:
             return True
         return False
+
+    def create_key(self):
+        private_key = rsa.generate_private_key(public_exponent=65537,
+                                               key_size=2048,
+                                               backend=default_backend())
+        public_key = private_key.public_key()
+        return private_key, public_key
+
+    def sign_root(self, sign_key):
+        sign_root = sign_key.sign(
+            self.get_root().encode(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return sign_root
+
+    def verify_sign(self, verify_key, sign, text):
+        try:
+            verify_key.verify(
+                sign,
+                text.encode(),
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            return True
+        except InvalidSignature:
+            return False
 
 
 # Use the insert method to add nodes
@@ -143,4 +182,9 @@ print(root.get_root())
 proof = root.get_proof(2)
 print("print prof")
 print(proof)
-root.check_proof(root.leaves[2].hash + " " + proof)
+proof = proof.replace("b", "c", 2)
+print(root.check_proof(root.leaves[2].hash + " " + proof))
+sk, pk = root.create_key()
+sign = root.sign_root(sk)
+try_root = root.get_root().replace("a", "v")
+print(root.verify_sign(pk, sign, try_root))
