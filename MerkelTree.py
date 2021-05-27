@@ -51,6 +51,7 @@ class MerkleTree:
         self.tree_size = 1
         self.leaves = [self.tree_root]
 
+    # input 1
     def add(self, data):
         inc_tree_size = True
         # finding where need to add the new leaf
@@ -81,24 +82,29 @@ class MerkleTree:
             f_node.father = self.tree_root
             self.tree_root.recalc_tree()
 
+    # input 2
     def get_root(self):
+        print(self.tree_root.hash)
         return self.tree_root.hash
 
+    # input 3
     def get_proof(self, leaf_num):
         leaf = self.leaves[leaf_num]
         father = leaf.father
         proof = ""
         while father is not None:
             if leaf != father.right:
-                proof += str(father.right.hash) + " "
+                proof += '1' + str(father.right.hash) + " "
             else:
-                proof += str(father.left.hash) + " "
+                proof += '0' + str(father.left.hash) + " "
             leaf = father
             father = father.father
         root = str(self.get_root())
         root += " " + proof[:len(proof) - 1]
+        print(root)
         return root
 
+    # input 4
     def check_proof(self, inc_proof):
         # splitting string for proof
         hash_list = inc_proof.split(" ")
@@ -107,44 +113,49 @@ class MerkleTree:
         for i in range(0, len(hash_list)):
             if i != 1:
                 hash_without_root.append(hash_list[i])
-        # checking for every proof if it is right or left node in the tree
-        node = self.tree_root
-        node_location = []
-        for i in range(0, len(hash_without_root) - 1):
-            if node.left.hash == hash_without_root[len(hash_without_root) - (i + 1)]:
-                node_location.append("left")
-                node = node.right
-            elif node.right.hash == hash_without_root[len(hash_without_root) - (i + 1)]:
-                node_location.append("right")
-                node = node.left
-            else:
-                print("hash not in tree")
-                return False
         # reverse locations list and start iterating from leaves to root and calculating hash function
-        node_location.reverse()
         for i in range(0, len(hash_without_root) - 1):
             digest = hashlib.sha256()
+            print(hash_without_root[i + 1][0])
             # if proof is from the right
-            if node_location[i] == 'right':
-                digest.update((hash_without_root[i] + hash_without_root[i + 1]).encode())
+            if hash_without_root[i + 1][0] == '1':
+                digest.update((hash_without_root[i] + hash_without_root[i + 1][1:]).encode())
 
             # if proof is from the left
-            if node_location[i] == 'left':
-                digest.update((hash_without_root[i + 1] + hash_without_root[i]).encode())
+            if hash_without_root[i + 1][0] == '0':
+                digest.update((hash_without_root[i + 1][1:] + hash_without_root[i]).encode())
             hash_without_root[i + 1] = digest.hexdigest()
+            print(digest.hexdigest())
         if digest.hexdigest() == hash_list[1]:
+            print('True')
             return True
+        print('False')
         return False
 
+    # input 5
     def create_key(self):
         private_key = rsa.generate_private_key(public_exponent=65537,
                                                key_size=2048,
                                                backend=default_backend())
         public_key = private_key.public_key()
-        return private_key, public_key
+        sk_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        pk_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        return sk_pem, pk_pem
 
+    # input 6
     def sign_root(self, sign_key):
-        sign_root = sign_key.sign(
+        sk = serialization.load_pem_private_key(
+            sign_key.encode('utf8'),
+            password=None,
+        )
+        sign_root = sk.sign(
             self.get_root().encode(),
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
@@ -154,9 +165,15 @@ class MerkleTree:
         )
         return sign_root
 
+    # input 7
     def verify_sign(self, verify_key, sign, text):
+        pk_pem = serialization.load_pem_public_key(
+            verify_key.encode('utf8'),
+            backend=None,
+        )
+
         try:
-            verify_key.verify(
+            pk_pem.verify(
                 sign,
                 text.encode(),
                 padding.PSS(
@@ -170,21 +187,49 @@ class MerkleTree:
             return False
 
 
-# Use the insert method to add nodes
-root = MerkleTree(1)
-root.add(2)
-root.add(3)
-root.add(4)
-print("print tree")
-root.tree_root.print_tree()
-print("print tree root")
-print(root.get_root())
-proof = root.get_proof(2)
-print("print prof")
-print(proof)
-proof = proof.replace("b", "c", 2)
-print(root.check_proof(root.leaves[2].hash + " " + proof))
-sk, pk = root.create_key()
-sign = root.sign_root(sk)
-try_root = root.get_root().replace("a", "v")
-print(root.verify_sign(pk, sign, try_root))
+if __name__ == '__main__':
+    root = MerkleTree(None)
+    while True:
+        user_input = input()
+        line = user_input.splitlines()
+        if user_input[0] == '1':
+            if root.tree_root.data is not None:
+                root.add(line[0][2:])
+            else:
+                root.tree_root = Node(line[0][2:])
+        elif user_input[0] == '2':
+            if root.tree_root.data is not None:
+                root.get_root()
+            else:
+                print('\n')
+        elif user_input[0] == '3':
+            if root.tree_root.data is not None:
+                root.get_proof(line[0][2:])
+            else:
+                print('\n')
+        elif user_input[0] == '4':
+            if root.tree_root.data is not None:
+                root.check_proof(line[0][2:])
+            else:
+                print('\n')
+        elif user_input[0] == '5':
+            root.create_key()
+        elif user_input[0] == '6':
+            inp = input()
+            while inp != '-----END RSA PRIVATE KEY-----':
+                if inp != '':
+                    user_input += '\n' + inp
+                inp = input()
+            user_input += '\n' + inp
+            root.sign_root(user_input[2:])
+        elif user_input[0] == '7':
+            inp = input()
+            while inp != '-----END RSA PRIVATE KEY-----':
+                if inp != '':
+                    user_input += '\n' + inp
+                inp = input()
+            user_input += '\n' + inp
+            for i in range(0, 1):
+                inp = input()
+                user_input += '\n' + inp
+            root.verify_sign(user_input[2:])
