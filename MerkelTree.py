@@ -4,6 +4,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
+import base64
 
 
 class Node:
@@ -84,7 +85,6 @@ class MerkleTree:
 
     # input 2
     def get_root(self):
-        print(self.tree_root.hash)
         return self.tree_root.hash
 
     # input 3
@@ -101,7 +101,6 @@ class MerkleTree:
             father = father.father
         root = str(self.get_root())
         root += " " + proof[:len(proof) - 1]
-        print(root)
         return root
 
     # input 4
@@ -127,9 +126,7 @@ class MerkleTree:
             hash_without_root[i + 1] = digest.hexdigest()
             print(digest.hexdigest())
         if digest.hexdigest() == hash_list[1]:
-            print('True')
             return True
-        print('False')
         return False
 
     # input 5
@@ -152,17 +149,16 @@ class MerkleTree:
     # input 6
     def sign_root(self, sign_key):
         sk = serialization.load_pem_private_key(
-            sign_key.encode('utf8'),
+            sign_key.encode(),
             password=None,
         )
-        sign_root = sk.sign(
-            self.get_root().encode(),
-            padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
-            ),
-            hashes.SHA256()
-        )
+        sign_root = sk.sign(self.get_root().encode(),
+                            padding.PSS(
+                                mgf=padding.MGF1(hashes.SHA256()),
+                                salt_length=padding.PSS.MAX_LENGTH),
+                            hashes.SHA256())
+        bs = base64.b64encode(sign_root)
+        print(bs)
         return sign_root
 
     # input 7
@@ -171,7 +167,6 @@ class MerkleTree:
             verify_key.encode('utf8'),
             backend=None,
         )
-
         try:
             pk_pem.verify(
                 sign,
@@ -199,21 +194,21 @@ if __name__ == '__main__':
                 root.tree_root = Node(line[0][2:])
         elif user_input[0] == '2':
             if root.tree_root.data is not None:
-                root.get_root()
+                print(root.get_root())
             else:
                 print('\n')
         elif user_input[0] == '3':
             if root.tree_root.data is not None:
-                root.get_proof(line[0][2:])
+                print(root.get_proof(line[0][2:]))
             else:
                 print('\n')
         elif user_input[0] == '4':
             if root.tree_root.data is not None:
-                root.check_proof(line[0][2:])
+                print(root.check_proof(line[0][2:]))
             else:
                 print('\n')
         elif user_input[0] == '5':
-            root.create_key()
+            print(root.create_key())
         elif user_input[0] == '6':
             inp = input()
             while inp != '-----END RSA PRIVATE KEY-----':
@@ -221,15 +216,17 @@ if __name__ == '__main__':
                     user_input += '\n' + inp
                 inp = input()
             user_input += '\n' + inp
-            root.sign_root(user_input[2:])
+            print(root.sign_root(user_input[2:]))
         elif user_input[0] == '7':
             inp = input()
-            while inp != '-----END RSA PRIVATE KEY-----':
+            while inp != '-----END PUBLIC KEY-----':
                 if inp != '':
                     user_input += '\n' + inp
                 inp = input()
             user_input += '\n' + inp
-            for i in range(0, 1):
+            inp = input()
+            while inp == '':
                 inp = input()
-                user_input += '\n' + inp
-            root.verify_sign(user_input[2:])
+            key_and_signed = inp
+            split = key_and_signed.split(' ')
+            print(root.verify_sign(user_input[2:], split[1], split[0]))
