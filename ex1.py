@@ -54,17 +54,22 @@ class MerkleTree:
     # input 1
     def add(self, data):
         inc_tree_size = True
+        f_node = Node(None)
+        leaves_len = len(self.leaves)
         # finding where need to add the new leaf
-        for leaf in self.leaves:
-            if leaf.level != self.tree_size:
-                inc_tree_size = False
-                break
+        if self.leaves[leaves_len - 1].level != self.tree_size:
+            inc_tree_size = False
         # if need to add new level return to root and adding new leaf
-        while leaf.father is not None and inc_tree_size:
-            leaf = leaf.father
+        if inc_tree_size:
+            leaf = self.tree_root
+            f_node.left = leaf
+        elif leaves_len % 2 == 0:
+            leaf = self.leaves[leaves_len - 1].father
+        else:
+            leaf = self.leaves[leaves_len - 1]
         # adding new leaf to the right and recalculating the tree
+        l_father = leaf.father
         r_node = Node(data)
-        f_node = Node('tmp')
         f_node.left = leaf
         f_node.right = r_node
         leaf.father = r_node.father = f_node
@@ -78,11 +83,11 @@ class MerkleTree:
             for leaf in self.leaves:
                 leaf.level += 1
         else:
-            # TODO find right node and change it - go to leaf and change leaf.father.right = f_node
-            self.tree_root.right = f_node
-            # TODO f_node.father = leaf.father
-            f_node.father = self.tree_root
-            self.tree_root.recalc_tree()
+            l_father.right = f_node
+            f_node.father = l_father
+            f_node.left.level += 1
+            f_node.right.level = f_node.left.level
+            l_father.recalc_tree()
 
     # input 2
     def get_root(self):
@@ -90,7 +95,7 @@ class MerkleTree:
 
     # input 3
     def get_proof(self, leaf_num):
-        leaf = self.leaves[leaf_num]
+        leaf = self.leaves[int(leaf_num)]
         father = leaf.father
         proof = ""
         while father is not None:
@@ -108,19 +113,17 @@ class MerkleTree:
     def check_proof(self, inc_proof):
         # splitting string for proof
         hash_list = inc_proof.split(" ")
-        # creating new list without root
-        hash_without_root = []
-        for i in range(0, len(hash_list)):
+        # creating new list without root and hashing data of leaf
+        hash_without_root = [hashlib.sha256(hash_list[0].encode()).hexdigest()]
+        for i in range(1, len(hash_list)):
             if i != 1:
                 hash_without_root.append(hash_list[i])
         # iterating from leaves to root and calculating hash function
         for i in range(0, len(hash_without_root) - 1):
             digest = hashlib.sha256()
-            print(hash_without_root[i + 1][0])
             # if proof is from the right
             if hash_without_root[i + 1][0] == '1':
                 digest.update((hash_without_root[i] + hash_without_root[i + 1][1:]).encode())
-
             # if proof is from the left
             if hash_without_root[i + 1][0] == '0':
                 digest.update((hash_without_root[i + 1][1:] + hash_without_root[i]).encode())
@@ -143,7 +146,8 @@ class MerkleTree:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
-        return sk_pem, pk_pem
+        str_keys = str(sk_pem.decode()) + '\n' + str(pk_pem.decode())
+        return str_keys
 
     # input 6
     def sign_root(self, sign_key):
@@ -157,7 +161,7 @@ class MerkleTree:
                                 salt_length=padding.PSS.MAX_LENGTH),
                             hashes.SHA256())
         bs64sign = base64.b64encode(sign_root)
-        return bs64sign
+        return bs64sign.decode()
 
     # input 7
     def verify_sign(self, verify_key, sign, text):
@@ -175,9 +179,9 @@ class MerkleTree:
                 ),
                 hashes.SHA256()
             )
-            return True
+            return 'True'
         except InvalidSignature:
-            return False
+            return 'False'
 
 
 if __name__ == '__main__':
@@ -190,21 +194,23 @@ if __name__ == '__main__':
                 root.add(line[0][2:])
             else:
                 root.tree_root = Node(line[0][2:])
+                root.leaves.clear()
+                root.leaves.append(root.tree_root)
         elif user_input[0] == '2':
             if root.tree_root.data is not None:
                 print(root.get_root())
             else:
-                print('\n')
+                print('')
         elif user_input[0] == '3':
             if root.tree_root.data is not None:
                 print(root.get_proof(line[0][2:]))
             else:
-                print('\n')
+                print('')
         elif user_input[0] == '4':
             if root.tree_root.data is not None:
                 print(root.check_proof(line[0][2:]))
             else:
-                print('\n')
+                print('')
         elif user_input[0] == '5':
             print(root.create_key())
         elif user_input[0] == '6':
@@ -214,6 +220,8 @@ if __name__ == '__main__':
                     user_input += '\n' + inp
                 inp = input()
             user_input += '\n' + inp
+            # read blank line
+            inp = input()
             print(root.sign_root(user_input[2:]))
         elif user_input[0] == '7':
             inp = input()
@@ -227,4 +235,7 @@ if __name__ == '__main__':
                 inp = input()
             key_and_signed = inp
             split = key_and_signed.split(' ')
-            root.verify_sign(user_input[2:], split[0], split[1])
+            if len(split) < 2:
+                inp = input()
+            split.append(inp)
+            print(root.verify_sign(user_input[2:], split[0], split[1]))
