@@ -1,10 +1,9 @@
 import hashlib
+import base64
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
-import base64
 
 
 class Node:
@@ -79,7 +78,9 @@ class MerkleTree:
             for leaf in self.leaves:
                 leaf.level += 1
         else:
+            # TODO find right node and change it - go to leaf and change leaf.father.right = f_node
             self.tree_root.right = f_node
+            # TODO f_node.father = leaf.father
             f_node.father = self.tree_root
             self.tree_root.recalc_tree()
 
@@ -112,7 +113,7 @@ class MerkleTree:
         for i in range(0, len(hash_list)):
             if i != 1:
                 hash_without_root.append(hash_list[i])
-        # reverse locations list and start iterating from leaves to root and calculating hash function
+        # iterating from leaves to root and calculating hash function
         for i in range(0, len(hash_without_root) - 1):
             digest = hashlib.sha256()
             print(hash_without_root[i + 1][0])
@@ -124,7 +125,6 @@ class MerkleTree:
             if hash_without_root[i + 1][0] == '0':
                 digest.update((hash_without_root[i + 1][1:] + hash_without_root[i]).encode())
             hash_without_root[i + 1] = digest.hexdigest()
-            print(digest.hexdigest())
         if digest.hexdigest() == hash_list[1]:
             return True
         return False
@@ -157,7 +157,6 @@ class MerkleTree:
                                 salt_length=padding.PSS.MAX_LENGTH),
                             hashes.SHA256())
         bs64sign = base64.b64encode(sign_root)
-        print(bs64sign)
         return bs64sign
 
     # input 7
