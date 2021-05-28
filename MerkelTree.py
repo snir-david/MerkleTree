@@ -132,8 +132,7 @@ class MerkleTree:
     # input 5
     def create_key(self):
         private_key = rsa.generate_private_key(public_exponent=65537,
-                                               key_size=2048,
-                                               backend=default_backend())
+                                               key_size=2048)
         public_key = private_key.public_key()
         sk_pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -157,19 +156,19 @@ class MerkleTree:
                                 mgf=padding.MGF1(hashes.SHA256()),
                                 salt_length=padding.PSS.MAX_LENGTH),
                             hashes.SHA256())
-        bs = base64.b64encode(sign_root)
-        print(bs)
-        return sign_root
+        bs64sign = base64.b64encode(sign_root)
+        print(bs64sign)
+        return bs64sign
 
     # input 7
     def verify_sign(self, verify_key, sign, text):
         pk_pem = serialization.load_pem_public_key(
-            verify_key.encode('utf8'),
+            verify_key.encode(),
             backend=None,
         )
         try:
             pk_pem.verify(
-                sign,
+                base64.decodebytes(sign.encode()),
                 text.encode(),
                 padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
@@ -229,4 +228,4 @@ if __name__ == '__main__':
                 inp = input()
             key_and_signed = inp
             split = key_and_signed.split(' ')
-            print(root.verify_sign(user_input[2:], split[1], split[0]))
+            root.verify_sign(user_input[2:], split[0], split[1])
