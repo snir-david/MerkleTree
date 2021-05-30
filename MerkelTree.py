@@ -180,8 +180,90 @@ class MerkleTree:
             return False
 
 
+class SparseMerkelTree:
+    def __init__(self):
+        self.hashes = ['0']
+        self.createHashesArray()
+        self.tree_root = Node(self.hashes[0])
+
+    def createHashesArray(self):
+        for i in range(1, 257):
+            level = hashlib.sha256()
+            level.update(self.hashes[0].encode() + self.hashes[0].encode())
+            self.hashes.insert(0, level.hexdigest())
+
+    def add_node(self, node, side, level):
+        temp = Node(self.hashes[level])
+        temp.level = level
+        temp.father = node
+        if side == 1:
+            node.right = temp
+        else:
+            node.left = temp
+
+    def markLeaf(self, digest):
+        node = self.tree_root
+        bin_value = bin(int(digest, base=16))[2:].zfill(256)
+        level = 1
+        for digit in bin_value[1:]:
+            if digit == 1 and node.right is not None:
+                node = node.right
+            elif digit == 1 and node.right is None:
+                self.add_node(node, 1, level)
+                node = node.right
+            elif digit == 0 and node.right is not None:
+                node = node.left
+            elif digit == 0 and node.right is None:
+                self.add_node(node, 0, level)
+                node = node.left
+            level += 1
+        hash_1 = hashlib.sha256()
+        hash_1.update(str(1).encode())
+        node.data = hash_1.hexdigest()
+        reverse_digest = bin_value[::-1]
+        level = 0
+        for i in reverse_digest[:256]:
+            new_data = hashlib.sha256()
+            #right child and have a brother
+            if i == 1 and node.father.left is not None:
+                new_data.update(node.data + node.father.left.data)
+                node.father = node
+                node.data = new_data
+            #right child and have no brother
+            elif i == 1:
+                new_data.update(node.data + self.hashes[level])
+                node.father = node
+                node.data = new_data
+            # left child and have a brother
+            elif i == 0 and node.father.right is not None:
+                new_data.update(node.data + node.father.right.data)
+                node.father = node
+                node.data = new_data
+            # left child and have no brother
+            elif i == 0:
+                new_data.update(node.data + self.hashes[level])
+                node.father = node
+                node.data = new_data
+            level += 1
+
+    def print1(self):
+        node = self.tree_root
+        if node.left:
+            node.left.print_tree()
+        print(node.data)
+        if node.right:
+            node.right.print_tree()
+
+    def print_root(self):
+        print(self.tree_root.data)
+
 if __name__ == '__main__':
     root = MerkleTree(None)
+    smt = SparseMerkelTree()
+    smt.print_root()
+    smt.markLeaf("1234567890123456789012345678901234567890aaaaaaaaaabbbbbbbbbbcccc")
+    smt.print_root()
+    #smt.markLeaf("1234567890123456789012345678901234567890aaaaaaaaaabbbbbbbbbbcccc")
     while True:
         user_input = input()
         line = user_input.splitlines()
@@ -228,3 +310,8 @@ if __name__ == '__main__':
             key_and_signed = inp
             split = key_and_signed.split(' ')
             root.verify_sign(user_input[2:], split[0], split[1])
+        elif user_input[0] == '8':
+            if root.tree_root.data is not None:
+                smt.markLeaf(line[0][2:])
+            else:
+                print('\n')
