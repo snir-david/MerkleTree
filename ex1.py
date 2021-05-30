@@ -37,7 +37,7 @@ class Node:
     def print_tree(self):
         if self.left:
             self.left.print_tree()
-        print(self.data, self.hash)
+        print(self.data)
         if self.right:
             self.right.print_tree()
 
@@ -184,140 +184,219 @@ class SparseMerkelTree:
         self.hashes = ['0']
         self.createHashesArray()
         self.tree_root = Node(self.hashes[0])
+        self.tree_root.level=0
 
     def createHashesArray(self):
-        for i in range(1, 257):
+        for i in range(0, 256):
             level = hashlib.sha256()
             level.update(self.hashes[0].encode() + self.hashes[0].encode())
             self.hashes.insert(0, level.hexdigest())
 
-    def add_node(self, node, side, level):
-        temp = Node(self.hashes[level])
-        temp.level = level
-        temp.father = node
+    def addNode(self, node, side, level):
+        new_node = Node(self.hashes[level])
+        new_node.level = level
+        new_node.father = node
         if side == '1':
-            node.right = temp
+            node.right = new_node
         else:
-            node.left = temp
+            node.left = new_node
+        return new_node
 
     def markLeaf(self, digest):
         node = self.tree_root
         bin_value = bin(int(digest, base=16))[2:].zfill(256)
         level = 1
-        for digit in bin_value[1:]:
+        for digit in bin_value:
             if digit == '1' and node.right is not None:
-                print(1)
                 node = node.right
             elif digit == '1' and node.right is None:
-                self.add_node(node, 1, level)
-                print(2)
-                node = node.right
+                node = self.addNode(node, 1, level)
             elif digit == '0' and node.left is not None:
-                print(node.left)
                 node = node.left
-                print(3)
             elif digit == '0' and node.left is None:
-                self.add_node(node, 0, level)
-                node = node.left
-                print(4)
+                node = self.addNode(node, 0, level)
             level += 1
-        hash_1 = hashlib.sha256()
-        hash_1.update(str(1).encode())
-        node.data = hash_1.hexdigest()
+        node.data = 1
         reverse_digest = bin_value[::-1]
-        level = 0
-        for i in reverse_digest[:256]:
+        level = 256
+        for i in reverse_digest:
             new_data = hashlib.sha256()
             #right child and have a brother
-            if i == 1 and node.father.left is not None:
-                new_data.update(node.data + node.father.left.data)
-                node.father = node
-                node.data = new_data
+            if i == '1' and node.father.left is not None:
+                new_data.update(bytes(str(node.data) + str(node.father.left.data),'utf8'))
+                node = node.father
+                node.data = new_data.hexdigest()
             #right child and have no brother
-            elif i == 1:
-                new_data.update(node.data + self.hashes[level])
-                node.father = node
-                node.data = new_data
+            elif i == '1' and node.father.left is None:
+                new_data.update(bytes(str(node.data) + str(self.hashes[level]), 'utf8'))
+                node = node.father
+                node.data = new_data.hexdigest()
             # left child and have a brother
-            elif i == 0 and node.father.right is not None:
-                new_data.update(node.data + node.father.right.data)
-                node.father = node
-                node.data = new_data
+            elif i == '0' and node.father.right is not None:
+                new_data.update(bytes(str(node.data) + str(node.father.right.data),'utf8'))
+                node = node.father
+                node.data = new_data.hexdigest()
             # left child and have no brother
-            elif i == 0:
-                new_data.update(node.data + self.hashes[level])
-                node.father = node
-                node.data = new_data
-            level += 1
+            elif i == '0' and node.father.right is None:
+                new_data.update(bytes(str(node.data) + str(self.hashes[level]), 'utf8'))
+                node = node.father
+                node.data = new_data.hexdigest()
+            level -= 1
 
-    def print1(self):
+    def proof(self, digest):
         node = self.tree_root
-        if node.left:
-            node.left.print_tree()
-        print(node.data)
-        if node.right:
-            node.right.print_tree()
+        bin_value = bin(int(digest, base=16))[2:].zfill(256)
+        level = 0
+        proof = []
+        for digit in bin_value:
+            if node.data == self.hashes[level]:
+                proof.insert(0,node.data)
+                break
+            level+=1
+            if digit == '1' and node.right is not None:
+                if node.left is not None:
+                    proof.insert(0,node.left.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = node.right
+            elif digit == '1' and node.right is None:
+                if node.left is not None:
+                    proof.insert(0,node.left.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = self.addNode(node, 1, level)
+            elif digit == '0' and node.left is not None:
+                if node.right is not None:
+                    proof.insert(0,node.right.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = node.left
+            elif digit == '0' and node.left is None:
+                if node.right is not None:
+                    proof.insert(0,node.right.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = self.addNode(node, 0, level)
+        proof.insert(0,self.tree_root.data)
+        output = ""
+        for x in proof:
+            output += str(x) + " "
+        return output
 
-    def print_root(self):
-        print(self.tree_root.data)
-
+    def check_proof(self, input):
+        data = input.pop(0)
+        hash = hashlib.sha256()
+        hash.update(str(data).encode() + str(data).encode())
+        print(hash.hexdigest())
+        proof_input = input.pop(0)
+        bin_value = bin(int(proof_input, base=16))[2:].zfill(256)
+        reverse = bin_value[::-1]
+        level = 255
+        proof = []
+        for digit in reverse:
+            if node.data == self.hashes[level]:
+                proof.insert(0, node.data)
+                break
+            level += 1
+            if digit == '1' and node.right is not None:
+                if node.left is not None:
+                    proof.insert(0, node.left.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = node.right
+            elif digit == '1' and node.right is None:
+                if node.left is not None:
+                    proof.insert(0, node.left.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = self.addNode(node, 1, level)
+            elif digit == '0' and node.left is not None:
+                if node.right is not None:
+                    proof.insert(0, node.right.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = node.left
+            elif digit == '0' and node.left is None:
+                if node.right is not None:
+                    proof.insert(0, node.right.data)
+                else:
+                    proof.insert(0, self.hashes[level])
+                node = self.addNode(node, 0, level)
+        check = ""
+        for x in input:
+            check += str(x) + " "
+        if proof == check and flag == bit:
+            return True
+        return False
 
 if __name__ == '__main__':
     root = MerkleTree(None)
     smt = SparseMerkelTree()
-    smt.print_root()
-    smt.markLeaf("1234567890123456789012345678901234567890aaaaaaaaaabbbbbbbbbbcccc")
-    smt.print_root()
-    # smt.markLeaf("1234567890123456789012345678901234567890aaaaaaaaaabbbbbbbbbbcccc")
-
     while True:
         user_input = input()
-        line = user_input.splitlines()
-        if user_input[0] == '1':
+        line = user_input.split()
+        if line[0] == '1':
             if root.tree_root.data is not None:
-                root.add(line[0][2:])
+                root.add(line[1])
             else:
                 root.tree_root = Node(line[0][2:])
-        elif user_input[0] == '2':
+        elif line[0] == '2':
             if root.tree_root.data is not None:
                 print(root.get_root())
             else:
                 print('\n')
-        elif user_input[0] == '3':
+        elif line[0] == '3':
             if root.tree_root.data is not None:
-                print(root.get_proof(line[0][2:]))
+                print(root.get_proof(line[1]))
             else:
                 print('\n')
-        elif user_input[0] == '4':
+        elif line[0] == '4':
             if root.tree_root.data is not None:
-                print(root.check_proof(line[0][2:]))
+                print(root.check_proof(line[1]))
             else:
                 print('\n')
-        elif user_input[0] == '5':
+        elif line[0] == '5':
             print(root.create_key())
-        elif user_input[0] == '6':
+        elif line[0] == '6':
             inp = input()
             while inp != '-----END RSA PRIVATE KEY-----':
                 if inp != '':
-                    user_input += '\n' + inp
+                    line[1] += '\n' + inp
                 inp = input()
-            user_input += '\n' + inp
-            print(root.sign_root(user_input[2:]))
-        elif user_input[0] == '7':
+            line[1] += '\n' + inp
+            print(root.sign_root(line[1]))
+        elif line[0] == '7':
             inp = input()
             while inp != '-----END PUBLIC KEY-----':
                 if inp != '':
-                    user_input += '\n' + inp
+                    line[1] += '\n' + inp
                 inp = input()
-            user_input += '\n' + inp
+            line[1] += '\n' + inp
             inp = input()
             while inp == '':
                 inp = input()
             key_and_signed = inp
             split = key_and_signed.split(' ')
             root.verify_sign(user_input[2:], split[0], split[1])
-        elif user_input[0] == '8':
-            if root.tree_root.data is not None:
-                smt.markLeaf(line[0][2:])
+        elif line[0] == '8':
+            if smt.tree_root.data is not None:
+                smt.markLeaf(line[1])
+            else:
+                print('\n')
+        elif line[0] == '9':
+            if smt.tree_root.data is not None:
+                print(smt.tree_root.data)
+            else:
+                print('\n')
+        elif line[0] == "10":
+            if smt.tree_root.data is not None:
+                proof = smt.proof(line[1])
+                print(proof)
+            else:
+                print('\n')
+        elif line[0] == "11":
+            if smt.tree_root.data is not None:
+                flag = smt.check_proof(line[1:])
+                print(flag)
             else:
                 print('\n')
