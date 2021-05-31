@@ -41,6 +41,7 @@ class Node:
         if self.right:
             self.right.print_tree()
 
+
 class MerkleTree:
 
     def __init__(self, data):
@@ -53,17 +54,22 @@ class MerkleTree:
     # input 1
     def add(self, data):
         inc_tree_size = True
+        f_node = Node(None)
+        leaves_len = len(self.leaves)
         # finding where need to add the new leaf
-        for leaf in self.leaves:
-            if leaf.level != self.tree_size:
-                inc_tree_size = False
-                break
+        if self.leaves[leaves_len - 1].level != self.tree_size:
+            inc_tree_size = False
         # if need to add new level return to root and adding new leaf
-        while leaf.father is not None and inc_tree_size:
-            leaf = leaf.father
+        if inc_tree_size:
+            leaf = self.tree_root
+            f_node.left = leaf
+        elif leaves_len % 2 == 0:
+            leaf = self.leaves[leaves_len - 1].father
+        else:
+            leaf = self.leaves[leaves_len - 1]
         # adding new leaf to the right and recalculating the tree
+        l_father = leaf.father
         r_node = Node(data)
-        f_node = Node('tmp')
         f_node.left = leaf
         f_node.right = r_node
         leaf.father = r_node.father = f_node
@@ -77,11 +83,11 @@ class MerkleTree:
             for leaf in self.leaves:
                 leaf.level += 1
         else:
-            # TODO find right node and change it - go to leaf and change leaf.father.right = f_node
-            self.tree_root.right = f_node
-            # TODO f_node.father = leaf.father
-            f_node.father = self.tree_root
-            self.tree_root.recalc_tree()
+            l_father.right = f_node
+            f_node.father = l_father
+            f_node.left.level += 1
+            f_node.right.level = f_node.left.level
+            l_father.recalc_tree()
 
     # input 2
     def get_root(self):
@@ -89,7 +95,7 @@ class MerkleTree:
 
     # input 3
     def get_proof(self, leaf_num):
-        leaf = self.leaves[leaf_num]
+        leaf = self.leaves[int(leaf_num)]
         father = leaf.father
         proof = ""
         while father is not None:
@@ -107,19 +113,17 @@ class MerkleTree:
     def check_proof(self, inc_proof):
         # splitting string for proof
         hash_list = inc_proof.split(" ")
-        # creating new list without root
-        hash_without_root = []
-        for i in range(0, len(hash_list)):
+        # creating new list without root and hashing data of leaf
+        hash_without_root = [hashlib.sha256(hash_list[0].encode()).hexdigest()]
+        for i in range(1, len(hash_list)):
             if i != 1:
                 hash_without_root.append(hash_list[i])
         # iterating from leaves to root and calculating hash function
         for i in range(0, len(hash_without_root) - 1):
             digest = hashlib.sha256()
-            print(hash_without_root[i + 1][0])
             # if proof is from the right
             if hash_without_root[i + 1][0] == '1':
                 digest.update((hash_without_root[i] + hash_without_root[i + 1][1:]).encode())
-
             # if proof is from the left
             if hash_without_root[i + 1][0] == '0':
                 digest.update((hash_without_root[i + 1][1:] + hash_without_root[i]).encode())
@@ -142,7 +146,8 @@ class MerkleTree:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
-        return sk_pem, pk_pem
+        str_keys = str(sk_pem.decode()) + '\n' + str(pk_pem.decode())
+        return str_keys
 
     # input 6
     def sign_root(self, sign_key):
@@ -156,7 +161,7 @@ class MerkleTree:
                                 salt_length=padding.PSS.MAX_LENGTH),
                             hashes.SHA256())
         bs64sign = base64.b64encode(sign_root)
-        return bs64sign
+        return bs64sign.decode()
 
     # input 7
     def verify_sign(self, verify_key, sign, text):
@@ -174,9 +179,9 @@ class MerkleTree:
                 ),
                 hashes.SHA256()
             )
-            return True
+            return 'True'
         except InvalidSignature:
-            return False
+            return 'False'
 
 
 class SparseMerkelTree:
@@ -184,7 +189,7 @@ class SparseMerkelTree:
         self.hashes = ['0']
         self.createHashesArray()
         self.tree_root = Node(self.hashes[0])
-        self.tree_root.level=0
+        self.tree_root.level = 0
 
     def createHashesArray(self):
         for i in range(0, 256):
@@ -221,19 +226,19 @@ class SparseMerkelTree:
         level = 256
         for i in reverse_digest:
             new_data = hashlib.sha256()
-            #right child and have a brother
+            # right child and have a brother
             if i == '1' and node.father.left is not None:
-                new_data.update(bytes(str(node.data) + str(node.father.left.data),'utf8'))
+                new_data.update(bytes(str(node.data) + str(node.father.left.data), 'utf8'))
                 node = node.father
                 node.data = new_data.hexdigest()
-            #right child and have no brother
+            # right child and have no brother
             elif i == '1' and node.father.left is None:
                 new_data.update(bytes(str(node.data) + str(self.hashes[level]), 'utf8'))
                 node = node.father
                 node.data = new_data.hexdigest()
             # left child and have a brother
             elif i == '0' and node.father.right is not None:
-                new_data.update(bytes(str(node.data) + str(node.father.right.data),'utf8'))
+                new_data.update(bytes(str(node.data) + str(node.father.right.data), 'utf8'))
                 node = node.father
                 node.data = new_data.hexdigest()
             # left child and have no brother
@@ -250,34 +255,34 @@ class SparseMerkelTree:
         proof = []
         for digit in bin_value:
             if node.data == self.hashes[level]:
-                proof.insert(0,node.data)
+                proof.insert(0, node.data)
                 break
-            level+=1
+            level += 1
             if digit == '1' and node.right is not None:
                 if node.left is not None:
-                    proof.insert(0,node.left.data)
+                    proof.insert(0, node.left.data)
                 else:
                     proof.insert(0, self.hashes[level])
                 node = node.right
             elif digit == '1' and node.right is None:
                 if node.left is not None:
-                    proof.insert(0,node.left.data)
+                    proof.insert(0, node.left.data)
                 else:
                     proof.insert(0, self.hashes[level])
                 node = self.addNode(node, 1, level)
             elif digit == '0' and node.left is not None:
                 if node.right is not None:
-                    proof.insert(0,node.right.data)
+                    proof.insert(0, node.right.data)
                 else:
                     proof.insert(0, self.hashes[level])
                 node = node.left
             elif digit == '0' and node.left is None:
                 if node.right is not None:
-                    proof.insert(0,node.right.data)
+                    proof.insert(0, node.right.data)
                 else:
                     proof.insert(0, self.hashes[level])
                 node = self.addNode(node, 0, level)
-        proof.insert(0,self.tree_root.data)
+        proof.insert(0, self.tree_root.data)
         output = ""
         for x in proof:
             output += str(x) + " "
@@ -328,6 +333,7 @@ class SparseMerkelTree:
         if proof == check and flag == bit:
             return True
         return False
+
 
 if __name__ == '__main__':
     root = MerkleTree(None)
