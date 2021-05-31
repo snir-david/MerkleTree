@@ -37,7 +37,7 @@ class Node:
     def print_tree(self):
         if self.left:
             self.left.print_tree()
-        print(self.data)
+        print(self.data, self.hash)
         if self.right:
             self.right.print_tree()
 
@@ -179,9 +179,9 @@ class MerkleTree:
                 ),
                 hashes.SHA256()
             )
-            return 'True'
+            return True
         except InvalidSignature:
-            return 'False'
+            return False
 
 
 class SparseMerkelTree:
@@ -345,64 +345,71 @@ if __name__ == '__main__':
             if root.tree_root.data is not None:
                 root.add(line[1])
             else:
-                root.tree_root = Node(line[0][2:])
+                root.tree_root = Node(line[1])
+                root.leaves.clear()
+                root.leaves.append(root.tree_root)
         elif line[0] == '2':
             if root.tree_root.data is not None:
                 print(root.get_root())
             else:
-                print('\n')
+                print()
         elif line[0] == '3':
             if root.tree_root.data is not None:
                 print(root.get_proof(line[1]))
             else:
-                print('\n')
+                print()
         elif line[0] == '4':
             if root.tree_root.data is not None:
-                print(root.check_proof(line[1]))
+                print(root.check_proof(user_input[2:]))
             else:
-                print('\n')
+                print()
         elif line[0] == '5':
             print(root.create_key())
-        elif line[0] == '6':
+        elif user_input[0] == '6':
             inp = input()
             while inp != '-----END RSA PRIVATE KEY-----':
                 if inp != '':
-                    line[1] += '\n' + inp
+                    user_input += '\n' + inp
                 inp = input()
-            line[1] += '\n' + inp
-            print(root.sign_root(line[1]))
-        elif line[0] == '7':
+            user_input += '\n' + inp
+            # read blank line
+            inp = input()
+            print(root.sign_root(user_input[2:]))
+        elif user_input[0] == '7':
             inp = input()
             while inp != '-----END PUBLIC KEY-----':
                 if inp != '':
-                    line[1] += '\n' + inp
+                    user_input += '\n' + inp
                 inp = input()
-            line[1] += '\n' + inp
+            user_input += '\n' + inp
             inp = input()
             while inp == '':
                 inp = input()
             key_and_signed = inp
             split = key_and_signed.split(' ')
-            root.verify_sign(user_input[2:], split[0], split[1])
+            if len(split) < 2:
+                inp = input()
+            split.append(inp)
+            print(root.verify_sign(user_input[2:], split[0], split[1]))
         elif line[0] == '8':
             if smt.tree_root.data is not None:
                 smt.markLeaf(line[1])
             else:
-                print('\n')
+                print()
         elif line[0] == '9':
             if smt.tree_root.data is not None:
                 print(smt.tree_root.data)
             else:
-                print('\n')
+                print()
         elif line[0] == "10":
             if smt.tree_root.data is not None:
                 proof = smt.proof(line[1])
                 print(proof)
             else:
-                print('\n')
+                print()
         elif line[0] == "11":
             if smt.tree_root.data is not None:
                 flag = smt.check_proof(line[1:])
                 print(flag)
             else:
-                print('\n')
+                print()
