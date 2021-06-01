@@ -289,48 +289,31 @@ class SparseMerkelTree:
         return output
 
     def check_proof(self, input):
-        data = input.pop(0)
-        hash = hashlib.sha256()
-        hash.update(str(data).encode() + str(data).encode())
-        print(hash.hexdigest())
-        proof_input = input.pop(0)
-        bin_value = bin(int(proof_input, base=16))[2:].zfill(256)
+        road = input.pop(0)
+        bin_value = bin(int(road, base=16))[2:].zfill(256)
         reverse = bin_value[::-1]
-        level = 255
+        data = input.pop(0)
+        if data == '1' and len(input) != 258:
+            return False
+        root = input[0]
         proof = []
-        for digit in reverse:
-            if node.data == self.hashes[level]:
-                proof.insert(0, node.data)
-                break
-            level += 1
-            if digit == '1' and node.right is not None:
-                if node.left is not None:
-                    proof.insert(0, node.left.data)
-                else:
-                    proof.insert(0, self.hashes[level])
-                node = node.right
-            elif digit == '1' and node.right is None:
-                if node.left is not None:
-                    proof.insert(0, node.left.data)
-                else:
-                    proof.insert(0, self.hashes[level])
-                node = self.addNode(node, 1, level)
-            elif digit == '0' and node.left is not None:
-                if node.right is not None:
-                    proof.insert(0, node.right.data)
-                else:
-                    proof.insert(0, self.hashes[level])
-                node = node.left
-            elif digit == '0' and node.left is None:
-                if node.right is not None:
-                    proof.insert(0, node.right.data)
-                else:
-                    proof.insert(0, self.hashes[level])
-                node = self.addNode(node, 0, level)
-        check = ""
-        for x in input:
-            check += str(x) + " "
-        if proof == check and flag == bit:
+        level = 256
+        y=0
+        for i in range(258,len(input),-1):
+            y+=1
+            proof.append(self.hashes[level])
+            level-=1
+        counter = 1
+        level+=1
+        for digit in reverse[256-level:]:
+            hash = hashlib.sha256()
+            if digit == '1':
+                hash.update((input[counter] + proof[-1]).encode())
+            else:
+                hash.update((proof[-1] + input[counter]).encode())
+            proof.append(hash.hexdigest())
+            counter+=1
+        if proof[-1] == root:
             return True
         return False
 
