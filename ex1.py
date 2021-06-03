@@ -191,12 +191,14 @@ class SparseMerkelTree:
         self.tree_root = Node(self.hashes[0])
         self.tree_root.level = 0
 
+    # create an array of deafult values to all level when the tree is new fill of zeroes
     def createHashesArray(self):
         for i in range(0, 256):
             level = hashlib.sha256()
             level.update(self.hashes[0].encode() + self.hashes[0].encode())
             self.hashes.insert(0, level.hexdigest())
 
+    #adding node to thr tree because his value is not the deafult value anymore
     def addNode(self, node, side, level):
         new_node = Node(self.hashes[level])
         new_node.level = level
@@ -207,6 +209,7 @@ class SparseMerkelTree:
             node.left = new_node
         return new_node
 
+    # chane the leaf data from 0 to 1 and then go up on the road and update the nodes that need to be updated
     def markLeaf(self, digest):
         node = self.tree_root
         bin_value = bin(int(digest, base=16))[2:].zfill(256)
@@ -248,11 +251,13 @@ class SparseMerkelTree:
                 node.data = new_data.hexdigest()
             level -= 1
 
+    # create the proof for this tree
     def proof(self, digest):
         node = self.tree_root
         bin_value = bin(int(digest, base=16))[2:].zfill(256)
         level = 0
         proof = []
+        #go in the inputed road to the leaf
         for digit in bin_value:
             if node.data == self.hashes[level]:
                 proof.insert(0, node.data)
@@ -283,11 +288,13 @@ class SparseMerkelTree:
                     proof.insert(0, self.hashes[level])
                 node = self.addNode(node, 0, level)
         proof.insert(0, self.tree_root.data)
+        # create the uotput proof from the buttom to the top (the root is in the beginning)
         output = ""
         for x in proof:
             output += str(x) + " "
         return output
 
+    # check if the proof for any SMT is correct or not
     def check_proof(self, input):
         road = input.pop(0)
         bin_value = bin(int(road, base=16))[2:].zfill(256)
@@ -300,11 +307,10 @@ class SparseMerkelTree:
         level = 256
         y=0
         for i in range(258,len(input),-1):
-            y+=1
             proof.append(self.hashes[level])
             level-=1
-        counter = 1
-        level+=1
+        proof.append(self.hashes[level])
+        counter = 2
         for digit in reverse[256-level:]:
             hash = hashlib.sha256()
             if digit == '1':
