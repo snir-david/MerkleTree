@@ -224,17 +224,20 @@ class MerkleTree:
 # class SparseMerkelTree represents a sparse merkle tree
 class SparseMerkelTree:
     def __init__(self):
+        #define all the class members
         self.hashes = ['0']
         self.createHashesArray()
         self.tree_root = Node(self.hashes[0])
         self.tree_root.level = 0
 
+    # create an array of deafult values to all level when the tree is new fill of zeroes
     def createHashesArray(self):
         for i in range(0, 256):
             level = hashlib.sha256()
             level.update(self.hashes[0].encode() + self.hashes[0].encode())
             self.hashes.insert(0, level.hexdigest())
 
+    #adding node to thr tree because his value is not the deafult value anymore
     def addNode(self, node, side, level):
         new_node = Node(self.hashes[level])
         new_node.level = level
@@ -245,7 +248,7 @@ class SparseMerkelTree:
             node.left = new_node
         return new_node
 
-    # input 8 - change leaf to 1
+    # chane the leaf data from 0 to 1 and then go up on the road and update the nodes that need to be updated
     def markLeaf(self, digest):
         node = self.tree_root
         bin_value = bin(int(digest, base=16))[2:].zfill(256)
@@ -293,6 +296,7 @@ class SparseMerkelTree:
         bin_value = bin(int(digest, base=16))[2:].zfill(256)
         level = 0
         proof = []
+        #go in the inputed road to the leaf
         for digit in bin_value:
             if node.data == self.hashes[level]:
                 proof.insert(0, node.data)
@@ -323,6 +327,7 @@ class SparseMerkelTree:
                     proof.insert(0, self.hashes[level])
                 node = self.addNode(node, 0, level)
         proof.insert(0, self.tree_root.data)
+        # create the output proof from the buttom to the top (the root is in the beginning)
         output = ""
         for x in proof:
             output += str(x) + " "
@@ -334,18 +339,21 @@ class SparseMerkelTree:
         bin_value = bin(int(road, base=16))[2:].zfill(256)
         reverse = bin_value[::-1]
         data = input.pop(0)
+        #if the leaf is 1 and the proof isnt full its have to be false
         if data == '1' and len(input) != 258:
             return False
         root = input[0]
         proof = []
         level = 256
         y = 0
+        #take the deafult values
         for i in range(258, len(input), -1):
             y += 1
             proof.append(self.hashes[level])
             level -= 1
         counter = 1
         level += 1
+        # take from the proof
         for digit in reverse[256 - level:]:
             hash = hashlib.sha256()
             if digit == '1':
