@@ -345,14 +345,12 @@ class SparseMerkelTree:
         root = input[0]
         proof = []
         level = 256
-        y = 0
         #take the deafult values
         for i in range(258, len(input), -1):
-            y += 1
             proof.append(self.hashes[level])
             level -= 1
-        counter = 1
-        level += 1
+        proof.append(self.hashes[level])
+        counter = 2
         # take from the proof
         for digit in reverse[256 - level:]:
             hash = hashlib.sha256()
